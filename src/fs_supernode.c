@@ -8,6 +8,14 @@ void fs_supernode_saveNode(struct fs_supernode * sn, struct fs_node * node) {
 	return sn->vtbl->saveNode(sn, node);
 }
 
+struct fs_node * fs_supernode_addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name) {
+	return sn->vtbl->addNode(sn, parent, type, name);
+}
+
+bool fs_supernode_removeNode(struct fs_supernode * sn, fs_node_id id) {
+	return sn->vtbl->removeNode(sn, id);
+}
+
 fs_node_id fs_supernode_getFreeNodeID(struct fs_supernode * sn) {
 	return sn->vtbl->getFreeNodeID(sn);
 }

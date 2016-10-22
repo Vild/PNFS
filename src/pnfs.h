@@ -16,15 +16,10 @@ struct pnfs_node {
 	struct fs_node base;
 
 #define sizeLeft (NODE_SIZE-sizeof(struct fs_node)+sizeof(void* /* vtbl */))
-	union {
-		struct {
-			fs_block_id dataBlocks[sizeLeft/sizeof(uint16_t) - 1];
-			fs_block_id next;
-		} regular;
-		uint8_t inlineData[sizeLeft];
-	};
+	fs_block_id dataBlocks[sizeLeft/sizeof(uint16_t) - 1];
+	fs_block_id next;
 #undef sizeLeft
-	
+
 	struct {
 		struct pnfs_supernode * sn;
 	} runtimeStorage;
@@ -50,7 +45,7 @@ struct pnfs_supernode * pnfs_init(struct fs_blockdevice * bd);
 Block 0: Header
  - Magic 0 - 3
  - FreeBlocksBitmap 4-35
- 
+
 Block 1-16: Node x 8 // Total of 128 Nodes
 
 Block 17: Root DirBlock

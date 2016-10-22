@@ -12,12 +12,16 @@ struct fs_direntry * fs_node_directoryEntries(struct fs_node * node, uint16_t * 
 	return node->vtbl->directoryEntries(node, amount);
 }
 
+void fs_node_insertDirEntry(struct fs_node * node, struct fs_direntry * entry) {
+	return node->vtbl->insertDirEntry(node, entry);
+}
+
 struct fs_node * fs_node_findNode(struct fs_node * node, char * path) {
 	return node->vtbl->findNode(node, path);
 }
 
-char * fs_node_getName(struct fs_node * node) {
-	return node->vtbl->getName(node);
+char * fs_node_getName(struct fs_node * node, struct fs_node * parent) {
+	return node->vtbl->getName(node, parent);
 }
 
 struct fs_node * fs_node_getParent(struct fs_node * node) {

@@ -44,4 +44,4 @@ clean:
 	@$(call ENDRM, "RM", "$(BIN) $(OBJ)")
 
 format:
-	astyle --style=java -n --indent=tab $(SOURCES) $(HEADERS)
+	astyle --style=java --indent=tab $(SOURCES) $(HEADERS)
