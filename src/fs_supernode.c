@@ -12,8 +12,8 @@ struct fs_node * fs_supernode_addNode(struct fs_supernode * sn, struct fs_node *
 	return sn->vtbl->addNode(sn, parent, type, name);
 }
 
-bool fs_supernode_removeNode(struct fs_supernode * sn, fs_node_id id) {
-	return sn->vtbl->removeNode(sn, id);
+bool fs_supernode_removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id) {
+	return sn->vtbl->removeNode(sn, parent, id);
 }
 
 fs_node_id fs_supernode_getFreeNodeID(struct fs_supernode * sn) {

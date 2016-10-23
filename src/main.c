@@ -256,13 +256,11 @@ static void mkdir_cmd() {
 		return;
 	}
 	
-	{
-		struct fs_node * n = fs_node_findNode(cwd, filename);
-		if (n) {
-			free(n);
-			printf("[-] There is already a node with that name\n");
-			return;
-		}
+	struct fs_node * n = fs_node_findNode(cwd, filename);
+	if (n) {
+		free(n);
+		printf("[-] There is already a node with that name\n");
+		return;
 	}
 	fs_supernode_addNode(sn, cwd, NODETYPE_DIRECTORY, filename);
 }
