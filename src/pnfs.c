@@ -209,7 +209,7 @@ static struct fs_node * pnfs_supernode_addNode(struct fs_supernode * sn, struct 
 	
 	if (type == NODETYPE_FILE) {
 		node->base.id = id;
-		nodew->base.type = NODETYPE_FILE;
+		node->base.type = NODETYPE_FILE;
 		node->base.size = 0;
 		node->base.blockCount = 0;
 	} else if (type == NODETYPE_DIRECTORY) {
@@ -460,10 +460,10 @@ static void pnfs_insertDirEntry(struct pnfs_node * node, struct fs_direntry * en
 static void pnfs_removeDirEntry(struct pnfs_node * node, fs_node_id id) {
 	struct fs_blockdevice * bd = node->runtimeStorage.sn->runtimeStorage.bd;
 
-	fs_block_id curBlock;
+	fs_block_id curBlock = 0;
 	struct fs_direntry curBlockData[8];
 	
-	fs_block_id oldBlock;
+	fs_block_id oldBlock = 0;
 	struct fs_direntry oldBlockData[8];
 	
 	if (node->base.type != NODETYPE_DIRECTORY)
