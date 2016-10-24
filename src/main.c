@@ -18,6 +18,8 @@ static struct fs_supernode * sn;
 
 static struct fs_node * cwd = NULL;
 
+static char * globalSaveptr;
+
 char * getCWD(struct fs_node * current, char * str, int * left) {
 	if (!current || *left <= 0)
 		return str;
@@ -110,7 +112,7 @@ struct cmd {
 };
 
 static void doCommand(char * line) {
-	char * part = strtok(line, " ");
+	char * part = strtok_r(line, " ", &globalSaveptr);
 	if (!part)
 		return;
 
@@ -144,7 +146,7 @@ static void doCommand(char * line) {
 
 // To get the other arguments the function below can use NEXT_TOKEN
 
-#define NEXT_TOKEN strtok(NULL, " ")
+#define NEXT_TOKEN strtok_r(NULL, " ", &globalSaveptr)
 
 static void cat_cmd() {
 	char * path = NEXT_TOKEN;
@@ -156,7 +158,7 @@ static void cat_cmd() {
 	struct fs_node * node = fs_node_findNode(cwd, path);
 
 	if (!node) {
-		printf("Could not find node!\n");
+		printf("[-] Could not find node!\n");
 		return;
 	}
 
@@ -269,7 +271,7 @@ static void pwd_cmd() {
 	char buf[0x1000];
 	int len = sizeof(buf);
 	getCWD(cwd, buf, &len);
-	printf("ID: %d,\tPath: %s\n", cwd->id, buf);
+	printf("%s\n", buf);
 }
 
 static void restoreImage_cmd() {
@@ -297,16 +299,40 @@ static void rm_cmd() {
 		printf("[-] A path is required!\n");
 		return;
 	}
+	
+	{ // Check if it is valid to remove, aka. It can't try and remove the '.' or '..' links
+		char * saveptr = NULL;
+		char * cur = strtok_r(path, "/", &saveptr);
+		char * last = NULL;
+		while (cur) {
+			last = cur;
+			cur = strtok_r(NULL, "/", &saveptr);
+		}
 
+		if (!last) {
+			printf("[-] Could not find node! Invalid path?\n");
+			return;
+		}
+
+		if (!strcmp(last, ".") || !strcmp(last, "..")) {
+			printf("[-] You cannot remove '.' or '..'!\n");
+			return;
+		}	
+	}
+	
 	struct fs_node * node = fs_node_findNode(cwd, path);
 	if (!node) {
-		printf("Could not find node!\n");
+		printf("[-] Could not find node!\n");
 		return;
 	}
 
 	fs_node_id id = node->id;
 	free(node);
-	fs_supernode_removeNode(sn, cwd, id);
+	if (fs_supernode_removeNode(sn, cwd, id))
+		printf("[+] Successfully removed %s\n", path);
+	else
+		printf("[-] Failed to remove %s\n", path);
+		
 }
 
 #undef NEXT_TOKEN

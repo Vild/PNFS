@@ -1,6 +1,6 @@
 #include "fs_node.h"
 
-void * fs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size) {
+uint16_t fs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size) {
 	return node->vtbl->readData(node, buffer, offset, size);
 }
 

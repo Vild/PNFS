@@ -1,0 +1,131 @@
+#+TITLE: PNFS
+#+AUTHOR: Dan Printzell
+#+EMAIL: me@vild.io
+
+* Introduction
+This is a filesystem that is designed and implemented for a school assignment.
+The structure is kinda based on ext2 and runs on a "virtual" HDD.
+That have 250 blocks, where each block is 512 bytes.
+
+The name PNFS stands for PowerNexFileSystem. But I haven't decided if I want to use this
+in [[https://github.com/Vild/PowerNex][PowerNex]].
+
+* License
+Mozilla Public License, version 2.0 - See LICENSE or [[https://www.mozilla.org/en-US/MPL/2.0/][here]].
+
+* Design 
+** Blocks
+ - Block 0
+	- Header
+ - Block 1-16
+	- Node x8 // Total of 128 Nodes
+ - Block 17 
+	- Root DirBlock
+   - DirEntries x8
+
+** Class diagram
+ #+begin_src plantuml :file images/classdiagram.png
+
+ class fs_block {
+	 data: uint8_t[512]
+ }
+
+ class fs_blockdevice {
+	 blocks: fs_block[250]
+
+	 clear(): void
+	 load(char * file): bool
+	 save(char * file): bool
+
+	 read(fs_block_id idx, fs_block * block)
+	 write(fs_block_id idx, fs_block * block)
+ }
+ fs_block --o fs_blockdevice
+
+ class fs_node {
+	 id: uint16_t
+	 type: uint16_t // fs_node_type
+	 size: uint16_t
+	 blockCount: uint16_t
+
+	 {abstract} readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): uint16_t
+	 {abstract} writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): bool
+
+	 {abstract} directoryEntries(struct fs_node * node, uint16_t * amount): fs_direntry *
+	 {abstract} findNode(struct fs_node * node, char * path): fs_node *
+
+	 {abstract} getName(struct fs_node * node, struct fs_node * parent): char *
+	 {abstract} getParent(struct fs_node * node): fs_node *
+ }
+
+ class fs_supernode {
+	 {abstract} getNode(struct fs_supernode * sn, fs_node_id id): fs_node *
+	 {abstract} saveNode(struct fs_supernode * sn, struct fs_node * node): void
+
+	 {abstract} addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
+	 {abstract} removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id): bool
+
+	 {abstract} getFreeNodeID(struct fs_supernode * sn): fs_node_id
+	 {abstract} getFreeBlockID(struct fs_supernode * sn): fs_block_id
+
+	 {abstract} setBlockUsed(struct fs_supernode * sn, fs_block_id id): void
+	 {abstract} setBlockFree(struct fs_supernode * sn, fs_block_id id): void
+ }
+
+ enum fs_nodes {
+	 Invalid
+	 Root
+ }
+
+ enum fs_node_type {
+	 Invalid
+	 File
+	 Directory
+	 NeverValid
+ }
+
+ class fs_direntry {
+	 id: fs_node_id 
+	 name: char[62]
+ }
+
+ class pnfs_node extends fs_node {
+	 dataBlocks: fs_block_id[27]
+	 next: fs_block_id
+
+	 runtimeStorage.sn: pnfs_supernode *
+
+	 readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): uint16_t
+	 writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): bool
+
+	 directoryEntries(struct fs_node * node, uint16_t * amount): fs_direntry *
+	 findNode(struct fs_node * node, char * path): fs_node *
+
+	 getName(struct fs_node * node, struct fs_node * parent): char *
+	 getParent(struct fs_node * node): fs_node *
+ }
+
+ class pnfs_supernode extends fs_supernode {
+	 magic: uint32_t
+	 freeBlocksBitmap: uint8_t[32]
+
+	 runtimeStorage.bd: fs_blockdevice *
+
+	 getNode(struct fs_supernode * sn, fs_node_id id): fs_node *
+	 saveNode(struct fs_supernode * sn, struct fs_node * node): void
+
+	 addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
+	 removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id): bool
+
+	 getFreeNodeID(struct fs_supernode * sn): fs_node_id
+	 getFreeBlockID(struct fs_supernode * sn): fs_block_id
+
+	 setBlockUsed(struct fs_supernode * sn, fs_block_id id): void
+	 setBlockFree(struct fs_supernode * sn, fs_block_id id): void
+ }
+
+ #+end_src
+
+ #+RESULTS:
+ [[file:images/classdiagram.png]]
+

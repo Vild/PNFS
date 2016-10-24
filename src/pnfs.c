@@ -23,7 +23,7 @@ static fs_block_id pnfs_supernode_getFreeBlockID(struct fs_supernode * sn);
 static void pnfs_supernode_setBlockUsed(struct fs_supernode * sn, fs_block_id id);
 static void pnfs_supernode_setBlockFree(struct fs_supernode * sn, fs_block_id id);
 
-static void * pnfs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
+static uint16_t pnfs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 static bool pnfs_node_writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 
 static struct fs_direntry * pnfs_node_directoryEntries(struct fs_node * node, uint16_t * amount);
@@ -242,6 +242,8 @@ static struct fs_node * pnfs_supernode_addNode(struct fs_supernode * sn, struct 
 }
 
 static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id) {
+	if (parent->id == id) // Trying to remove '.'
+		return false;
 	struct pnfs_node * node = (struct pnfs_node *)fs_supernode_getNode(sn, id);
 	if (node->base.type == NODETYPE_FILE) {		
 		for (int i = 0; i < sizeof(node->dataBlocks) / sizeof(fs_block_id); i++) {
@@ -270,7 +272,16 @@ static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node *
 			blockBlockID = blockBlock.next;
 		}
 	}	else if (node->base.type == NODETYPE_DIRECTORY) {
-		
+		uint16_t amount;
+		struct fs_direntry * dir = fs_node_directoryEntries((struct fs_node *)node, &amount);
+		if (dir) {
+			for (uint16_t i = 0; i < amount; i++) {
+				if (!strcmp(dir[i].name, ".") || !strcmp(dir[i].name, ".."))
+					continue;
+				fs_supernode_removeNode(sn, (struct fs_node *)node, dir[i].id);
+			}
+			free(dir);
+		}
 	}
 
 	pnfs_removeDirEntry((struct pnfs_node *)parent, id);
@@ -281,7 +292,10 @@ static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node *
 
 	fs_supernode_saveNode(sn, (struct fs_node *)node);
 	free(node);
-	return false;
+
+	parent->size -= sizeof(struct fs_direntry);
+	fs_supernode_saveNode(sn, parent);
+	return true;
 }
 
 static fs_node_id pnfs_supernode_getFreeNodeID(struct fs_supernode * sn) {
@@ -319,7 +333,11 @@ static void pnfs_supernode_setBlockFree(struct fs_supernode * sn_, fs_block_id i
 	sn->freeBlocksBitmap[id/8] &= ~(1 << (id % 8));
 }
 
-static void * pnfs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size) {
+static uint16_t pnfs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size) {
+
+
+
+	
 	return NULL;
 }
 

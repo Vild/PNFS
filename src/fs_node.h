@@ -4,7 +4,7 @@
 #include "fs.h"
 
 struct fs_node_vtbl {
-	void * (*readData)(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
+	uint16_t (*readData)(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 	bool (*writeData)(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 
 	struct fs_direntry * (*directoryEntries)(struct fs_node * node, uint16_t * amount);
@@ -22,7 +22,7 @@ struct fs_node {
 	uint16_t blockCount;
 };
 
-void * fs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
+uint16_t fs_node_readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 bool fs_node_writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
 
 struct fs_direntry * fs_node_directoryEntries(struct fs_node * node, uint16_t * amount);
