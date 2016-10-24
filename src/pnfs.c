@@ -75,7 +75,7 @@ struct pnfs_blockBlock {
 // Local functions
 static struct pnfs_supernode * pnfs_initFS(struct fs_blockdevice * bd, struct pnfs_supernode * sn);
 static void pnfs_insertDirEntry(struct pnfs_node * node, struct fs_direntry * entry);
-static void pnfs_removeDirEntry(struct pnfs_node * node, struct fs_direntry * entry);
+static void pnfs_removeDirEntry(struct pnfs_node * node, fs_node_id id);
 
 // Code
 struct pnfs_supernode * pnfs_init(struct fs_blockdevice * bd) {
@@ -208,9 +208,11 @@ static struct fs_node * pnfs_supernode_addNode(struct fs_supernode * sn, struct 
 	struct pnfs_node * node = (struct pnfs_node *)fs_supernode_getNode((struct fs_supernode *)sn, id);
 	
 	if (type == NODETYPE_FILE) {
-		//TODO:
+		node->base.id = id;
+		nodew->base.type = NODETYPE_FILE;
+		node->base.size = 0;
+		node->base.blockCount = 0;
 	} else if (type == NODETYPE_DIRECTORY) {
-		
 		node->base.id = id;
 		node->base.type = NODETYPE_DIRECTORY;
 		node->base.size = sizeof(struct fs_direntry) * 2;
@@ -235,11 +237,12 @@ static struct fs_node * pnfs_supernode_addNode(struct fs_supernode * sn, struct 
 	struct fs_direntry entry;
 	entry.id = id;
 	strncpy(entry.name, name, sizeof(entry.name));
-	fs_node_insertDirEntry(parent, &entry);
+	pnfs_insertDirEntry((struct pnfs_node *)parent, &entry);
 	return (struct fs_node *)node;
 }
 
 static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id) {
+	struct pnfs_node * node = (struct pnfs_node *)fs_supernode_getNode(sn, id);
 	if (node->base.type == NODETYPE_FILE) {		
 		for (int i = 0; i < sizeof(node->dataBlocks) / sizeof(fs_block_id); i++) {
 			if (!node->dataBlocks[i])
@@ -253,7 +256,7 @@ static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node *
 		struct fs_blockdevice * bd = ((struct pnfs_supernode *)sn)->runtimeStorage.bd;
 		
 		while (blockBlockID) {
-			fs_blockdevice_read(bd, blockBlockID, &blockBlock);
+			fs_blockdevice_read(bd, blockBlockID, (struct fs_block *)&blockBlock);
 
 			for (int i = 0; i < sizeof(blockBlock.dataBlocks) / sizeof(fs_block_id); i++) {
 				if (!node->dataBlocks[i])
@@ -270,10 +273,12 @@ static bool pnfs_supernode_removeNode(struct fs_supernode * sn, struct fs_node *
 		
 	}
 
+	pnfs_removeDirEntry((struct pnfs_node *)parent, id);
+	
 	node->base.type = NODETYPE_INVALID;
 	node->base.size = 0;
 	node->base.blockCount = 0;
-	
+
 	fs_supernode_saveNode(sn, (struct fs_node *)node);
 	free(node);
 	return false;
@@ -371,8 +376,7 @@ static struct fs_direntry * pnfs_node_directoryEntries(struct fs_node * node_, u
 	return NULL;
 }
 
-static void pnfs_node_insertDirEntry(struct fs_node * node_, struct fs_direntry * entry) {
-	struct pnfs_node * node = (struct pnfs_node *)node_;
+static void pnfs_insertDirEntry(struct pnfs_node * node, struct fs_direntry * entry) {
 	struct pnfs_supernode * sn = node->runtimeStorage.sn;
 	struct fs_blockdevice * bd = sn->runtimeStorage.bd;
 	uint16_t dirPos = node->base.size / sizeof(struct fs_direntry); // What index it has in dirEntries
@@ -453,8 +457,88 @@ static void pnfs_node_insertDirEntry(struct fs_node * node_, struct fs_direntry 
 	fs_supernode_saveNode((struct fs_supernode *)sn, (struct fs_node *)node);
 }
 
-static void pnfs_removeDirEntry(struct pnfs_node * node, struct fs_direntry * entry) {
+static void pnfs_removeDirEntry(struct pnfs_node * node, fs_node_id id) {
+	struct fs_blockdevice * bd = node->runtimeStorage.sn->runtimeStorage.bd;
+
+	fs_block_id curBlock;
+	struct fs_direntry curBlockData[8];
 	
+	fs_block_id oldBlock;
+	struct fs_direntry oldBlockData[8];
+	
+	if (node->base.type != NODETYPE_DIRECTORY)
+		return;
+	
+	for (int i = 0; i < sizeof(node->dataBlocks) / sizeof(fs_block_id); i++) {
+		curBlock = node->dataBlocks[i];
+		if (!curBlock)
+			return;
+		
+		fs_blockdevice_read(bd, curBlock, (struct fs_block *)&curBlockData);
+
+		if (oldBlock) {
+			memcpy(&oldBlockData[7], &curBlockData[0], sizeof(struct fs_direntry));
+			fs_blockdevice_read(bd, oldBlock, (struct fs_block *)&oldBlockData);
+
+			// Shift 1 step right
+			memmove(&curBlockData[0], &curBlockData[1], sizeof(struct fs_direntry) * 7);
+
+			// Setup for next move
+			oldBlock = curBlock;
+			memcpy(&oldBlockData, &curBlockData, sizeof(curBlockData));
+		} else
+			for (int j = 0; j < 8; j++) {
+				if (curBlockData[j].id == id) {
+					if (j < 7)
+						memmove(&curBlockData[j], &curBlockData[j+1], sizeof(struct fs_direntry) * (7 - j));
+					
+					oldBlock = curBlock;
+					memcpy(&oldBlockData, &curBlockData, sizeof(curBlockData));
+				}
+			}
+	}
+
+
+	struct pnfs_blockBlock blockBlock;
+	blockBlock.next = node->next; // Hack ;)
+
+	while (blockBlock.next) {
+		fs_blockdevice_read(bd, blockBlock.next, (struct fs_block *)&blockBlock);
+		for (int i = 0; i < sizeof(blockBlock.dataBlocks)/sizeof(fs_block_id); i++) {
+			curBlock = blockBlock.dataBlocks[i];
+			if (!curBlock)
+				return;
+		
+			fs_blockdevice_read(bd, curBlock, (struct fs_block *)&curBlockData);
+
+			if (oldBlock) {
+				memcpy(&oldBlockData[7], &curBlockData[0], sizeof(struct fs_direntry));
+				fs_blockdevice_read(bd, oldBlock, (struct fs_block *)&oldBlockData);
+
+				// Shift 1 step right
+				memmove(&curBlockData[0], &curBlockData[1], sizeof(struct fs_direntry) * 7);
+
+				// Setup for next move
+				oldBlock = curBlock;
+				memcpy(&oldBlockData, &curBlockData, sizeof(curBlockData));
+			} else
+				for (int j = 0; j < 8; j++) {
+					if (curBlockData[j].id == id) {
+						if (j < 7)
+							memmove(&curBlockData[j], &curBlockData[j+1], sizeof(struct fs_direntry) * (7 - j));
+					
+						oldBlock = curBlock;
+						memcpy(&oldBlockData, &curBlockData, sizeof(curBlockData));
+					}
+			}
+		}
+	}
+
+	memset(&oldBlockData[7], 0, sizeof(struct fs_direntry));
+	fs_blockdevice_read(bd, oldBlock, (struct fs_block *)&oldBlockData);
+
+	node->base.size -= sizeof(struct fs_direntry);
+	fs_supernode_saveNode((struct fs_supernode *)node->runtimeStorage.sn, (struct fs_node *)node);
 }
 
 static struct fs_node * pnfs_node_findNode(struct fs_node * node, char * path) {

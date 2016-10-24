@@ -306,7 +306,7 @@ static void rm_cmd() {
 
 	fs_node_id id = node->id;
 	free(node);
-	fs_supernode_removeNode(sn, id);
+	fs_supernode_removeNode(sn, cwd, id);
 }
 
 #undef NEXT_TOKEN
