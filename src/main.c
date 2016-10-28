@@ -104,10 +104,17 @@ static void pwd_cmd();
 static void restoreImage_cmd();
 static void rm_cmd();
 
+/**
+ * Helper struct for command parsing
+ */
 struct cmd {
+	/// The command name
 	const char * name;
+	/// The function to call when the command is triggered
 	void (*func)();
+	/// The arguments needed - For printing help
 	const char * args;
+	/// The description of the command - For printing help
 	const char * desc;
 };
 
