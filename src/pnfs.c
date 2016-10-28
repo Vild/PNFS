@@ -358,16 +358,19 @@ static void pnfs_supernode_setBlockFree(struct fs_supernode * sn_, fs_block_id i
 }
 
 static uint16_t pnfs_node_readData(struct fs_node * node_, void * buffer, uint16_t offset, uint16_t size) {
-	struct pnfs_node * node = (struct pnfs_node *)node_;
+	uint16_t read = 0;
+	/*struct pnfs_node * node = (struct pnfs_node *)node_;
 	if (node->base.size <= offset)
 		return 0;
 
-	uint16_t read = 0;
+	
 
+	uint16_t currentPos;
 	// Lazy read solution, but works ^_^
 	for (uint16_t i = 0; i < min(node->base.blockCount, PNFS_NODE_BLOCKCOUNT); i++)
 		if (node->dataBlocks[i]) {
-		}
+			
+		}*/
 	//TODO:
 	
 	return read;
@@ -594,18 +597,57 @@ static void pnfs_removeDirEntry(struct pnfs_node * node, fs_node_id id) {
 
 
 static void pnfs_addBlock(struct pnfs_node * node) {
-	//TODO:
+	struct fs_supernode * sn = (struct fs_supernode *)node->runtimeStorage.sn;
+	for (int i = 0; i < PNFS_NODE_BLOCKCOUNT; i++)
+		if (!node->dataBlocks[i]) {
+			fs_supernode_setBlockUsed(sn, node->dataBlocks[i] = fs_supernode_getFreeBlockID(sn));
+			return;
+		}
+
+	struct fs_blockdevice * bd = node->runtimeStorage.sn->runtimeStorage.bd;
+	struct pnfs_blockBlock blockBlock;
+	fs_block_id curID = node->next;
+	fs_blockdevice_read(bd, curID, (struct fs_block *)&blockBlock);
+	while (true) {
+		for (int i = 0; i < PNFS_BLOCKBLOCK_BLOCKCOUNT; i++)
+			if (!blockBlock.dataBlocks[i]) {
+				fs_supernode_setBlockUsed(sn, blockBlock.dataBlocks[i] = fs_supernode_getFreeBlockID(sn));
+				fs_blockdevice_write(bd, curID, (struct fs_block *)&blockBlock);
+				return;
+			}
+
+		curID = blockBlock.next;
+		if (!curID)
+			break;
+
+		fs_blockdevice_read(bd, curID, (struct fs_block *)&blockBlock);
+	}
+
+	fs_block_id newBlock = fs_supernode_getFreeBlockID((struct fs_supernode *)sn);
+	fs_supernode_setBlockUsed(sn, newBlock);
+	blockBlock.next = newBlock;
+	fs_blockdevice_write(bd, curID, (struct fs_block *)&blockBlock);
+	
+	fs_block_id newEntry = fs_supernode_getFreeBlockID((struct fs_supernode *)sn);
+	fs_supernode_setBlockUsed(sn, newEntry);
+	
+	memset(&blockBlock, 0, sizeof(struct pnfs_blockBlock));
+	fs_blockdevice_write(bd, newEntry, (struct fs_block *)&blockBlock);
+
+	blockBlock.dataBlocks[0] = newEntry;	
+	fs_blockdevice_write(bd, newBlock, (struct fs_block *)&blockBlock);
 }
 
 static void pnfs_removeBlockBlock(struct pnfs_supernode * sn, struct pnfs_blockBlock * blockBlock) {
 	struct fs_blockdevice * bd = sn->runtimeStorage.bd;
 	fs_block_id next = blockBlock->next;
 	
-	for (int i = 0; i < sizeof(blockBlock->dataBlocks)/sizeof(fs_block_id); i++)
+	for (int i = 0; i < PNFS_BLOCKBLOCK_BLOCKCOUNT; i++)
 		if (blockBlock->dataBlocks[i])
 			fs_supernode_setBlockFree((struct fs_supernode *)sn, blockBlock->dataBlocks[i]);
 
 	fs_blockdevice_read(bd, next, (struct fs_block *)blockBlock);
+	fs_supernode_setBlockFree((struct fs_supernode *)sn, next);
 	pnfs_removeBlockBlock(sn, blockBlock);
 }
 
@@ -626,12 +668,46 @@ static void pnfs_removeBlocks(struct pnfs_node * node) {
 				fs_blockdevice_read(bd, node->next, (struct fs_block *)&blockBlock);
 													
 				pnfs_removeBlockBlock(sn, &blockBlock);
+				fs_supernode_setBlockFree((struct fs_supernode *)sn, node->next);
+				
 				node->next = 0;
 			}
-		} else {
+		} else if (node->next) {
 			struct pnfs_blockBlock blockBlock;
-			int numNextWalks = divRoundUp(blocksNeeded - PNFS_NODE_BLOCKCOUNT, sizeof(blockBlock.dataBlocks)/sizeof(fs_block_id));
-			//TODO:
+			fs_block_id prevID = 0;
+			fs_block_id curID = node->next;
+			fs_blockdevice_read(bd, curID, (struct fs_block *)&blockBlock);
+			blocksNeeded -= PNFS_NODE_BLOCKCOUNT;
+
+			while (blocksNeeded >= PNFS_BLOCKBLOCK_BLOCKCOUNT) {
+				prevID = curID;
+				curID = node->next;
+				fs_blockdevice_read(bd, curID, (struct fs_block *)&blockBlock);
+				blocksNeeded -= PNFS_BLOCKBLOCK_BLOCKCOUNT;
+			}
+
+			if (blocksNeeded) { // Leave block
+				for (int i = blocksNeeded; i < PNFS_NODE_BLOCKCOUNT; i++)				
+					if (blockBlock.dataBlocks[i])
+						fs_supernode_setBlockFree((struct fs_supernode *)sn, blockBlock.dataBlocks[i]);
+			
+				if (blockBlock.next) {
+					struct pnfs_blockBlock blockBlock2;
+					fs_blockdevice_read(bd, node->next, (struct fs_block *)&blockBlock2);
+					pnfs_removeBlockBlock(sn, &blockBlock2);
+					fs_supernode_setBlockFree((struct fs_supernode *)sn, node->next);
+				
+					blockBlock.next = 0;
+					fs_blockdevice_write(bd, curID, (struct fs_block *)&blockBlock);
+				}
+			} else { // Remove block aswell
+				pnfs_removeBlockBlock(sn, &blockBlock);
+				fs_supernode_setBlockFree((struct fs_supernode *)sn, curID);
+
+				fs_blockdevice_read(bd, prevID, (struct fs_block *)&blockBlock);
+				blockBlock.next = 0;
+				fs_blockdevice_write(bd, prevID, (struct fs_block *)&blockBlock);
+			}
 		}
 		fs_supernode_saveNode((struct fs_supernode *)sn, (struct fs_node *)node);	
 	}
