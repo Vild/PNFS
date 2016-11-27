@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Iinclude -Wall -Werror -std=gnu11 -ggdb
+CFLAGS := -Iinclude -std=gnu11 -ggdb
 LFLAGS := -ledit
 
 SRC := src/

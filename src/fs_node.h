@@ -25,7 +25,7 @@ struct fs_node_vtbl {
 	 * \see fs_node_directoryEntries
 	 */
 	struct fs_direntry * (*directoryEntries)(struct fs_node * node, uint16_t * amount);
-	
+
 	/**
 	 * Prototype of fs_node_findNode.
 	 * \see fs_node_findNode
@@ -55,7 +55,7 @@ struct fs_node {
 
 	/// The node id
 	fs_node_id id;
-	
+
 	/// What type the node is
 	/// \relates fs_node_type
 	uint16_t type;

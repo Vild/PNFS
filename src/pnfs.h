@@ -38,7 +38,7 @@ struct pnfs_node {
 	struct fs_node base;
 
 
-	/// The data block indices 
+	/// The data block indices
 	fs_block_id dataBlocks[PNFS_NODE_BLOCKCOUNT];
 
 	/// The index of a pnfs_blockBlock, when a file needs more block than there are in \ref dataBlocks

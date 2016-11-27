@@ -27,15 +27,15 @@ char * getCWD(struct fs_node * current, char * str, int * left) {
 	char * name = NULL;
 	if (current->id == NODE_ROOT)
 		return str;
-	
+
 	struct fs_node * parent = fs_node_getParent(current);
 
 	if (!parent)
 		return str;
-	
+
 	str = getCWD(parent, str, left);
 	name = fs_node_getName(current, parent);
-	free(parent);			
+	free(parent);
 	if (!name)
 		return str;
 
@@ -43,7 +43,7 @@ char * getCWD(struct fs_node * current, char * str, int * left) {
 	free(name);
 	*left -= len;
 	str += len;
-	
+
 	return str;
 }
 
@@ -78,7 +78,7 @@ int main(int argc, char ** argv) {
 		}
 		char * line = readline(PS1);
 		if (!line)
-			break;
+			continue;
 
 		add_history(line);
 		doCommand(line);
@@ -169,9 +169,10 @@ static void cat_cmd() {
 		return;
 	}
 
-	char * buf = malloc(node->size);
+	char * buf = malloc(node->size + 1);
+	buf[node->size] = '\0';
 	fs_node_readData(node, buf, 0, node->size);
-	printf("%*s\n\n", node->size, buf);
+	printf("%s\n", buf);
 	free(buf);
 	free(node);
 }
@@ -198,11 +199,110 @@ static void cd_cmd() {
 }
 
 static void copy_cmd() {
+	char * from = NEXT_TOKEN;
+	if (!from) {
+		printf("[-] A from is required!\n");
+		return;
+	}
 
+	char * to = NEXT_TOKEN;
+	if (!to) {
+		printf("[-] A to is required!\n");
+		return;
+	}
+
+	struct fs_node * fromNode = fs_node_findNode(cwd, from);
+	if (!fromNode)
+		return;
+
+	struct fs_node * parent = cwd;
+
+	char * lastSlash = strrchr(to, '/');
+	if (lastSlash) {
+		*lastSlash = '\0';
+		parent = fs_node_findNode(parent, to);
+		to = lastSlash + 1;
+	}
+
+	if (!parent) {
+		printf("[-] Could not find parent for <to>!\n");
+		goto earlyRet;
+	}
+
+	struct fs_node * toNode = fs_supernode_addNode(sn, parent, NODETYPE_FILE, to);
+	if (!toNode) {
+		printf("[-] Could not add node!\n");
+		goto earlyRet;
+	}
+
+	uint16_t size = fromNode->size;
+	char * buf = malloc(size);
+	fs_node_readData(fromNode, buf, 0, size);
+	fs_node_writeData(toNode, buf, 0, size);
+	free(buf);
+
+	free(toNode);
+earlyRet:
+	free(fromNode);
 }
 
 static void create_cmd() {
+	char * path = NEXT_TOKEN;
+	if (!path) {
+		printf("[-] A filename is required!\n");
+		return;
+	}
 
+	struct fs_node * parent = cwd;
+
+	char * lastSlash = strrchr(path, '/');
+	if (lastSlash) {
+		*lastSlash = '\0';
+		path = lastSlash + 1;
+		parent = fs_node_findNode(parent, path);
+	}
+
+	if (!parent) {
+		printf("[-] Could not find parent!\n");
+		return;
+	}
+
+	struct fs_node * node = fs_supernode_addNode(sn, parent, NODETYPE_FILE, path);
+	if (!node) {
+		printf("[-] Could not add node!\n");
+		goto ret;
+	}
+
+	printf("Please write the content you want in the file. End with a Ctrl-D on a empty line.\n");
+
+	uint16_t offset = 0;
+	while (true) {
+		char * line = readline("");
+
+		if (!line) // Ctrl-D
+			break;
+
+		if (*line) {
+			uint16_t wrote = fs_node_writeData(node, line, offset, strlen(line));
+			if (!wrote) {
+				printf("[-] Failed to write to file. Probably out of disk storage\n");
+				free(line);
+				break;
+			}
+			offset += wrote;
+		}
+
+
+		offset += fs_node_writeData(node, "\n", offset, 1);
+
+		free(line);
+	}
+
+	free(node);
+
+ret:
+	if (lastSlash)
+		free(parent);
 }
 
 static void createImage_cmd() {
@@ -264,14 +364,14 @@ static void mkdir_cmd() {
 		printf("[-] A filename is required!\n");
 		return;
 	}
-	
+
 	struct fs_node * n = fs_node_findNode(cwd, filename);
 	if (n) {
 		free(n);
 		printf("[-] There is already a node with that name\n");
 		return;
 	}
-	fs_supernode_addNode(sn, cwd, NODETYPE_DIRECTORY, filename);
+	free(fs_supernode_addNode(sn, cwd, NODETYPE_DIRECTORY, filename));
 }
 
 static void pwd_cmd() {
@@ -306,8 +406,9 @@ static void rm_cmd() {
 		printf("[-] A path is required!\n");
 		return;
 	}
-	
-	{ // Check if it is valid to remove, aka. It can't try and remove the '.' or '..' links
+
+	{
+		// Check if it is valid to remove, aka. It can't try and remove the '.' or '..' links
 		char * saveptr = NULL;
 		char * cur = strtok_r(path, "/", &saveptr);
 		char * last = NULL;
@@ -324,9 +425,9 @@ static void rm_cmd() {
 		if (!strcmp(last, ".") || !strcmp(last, "..")) {
 			printf("[-] You cannot remove '.' or '..'!\n");
 			return;
-		}	
+		}
 	}
-	
+
 	struct fs_node * node = fs_node_findNode(cwd, path);
 	if (!node) {
 		printf("[-] Could not find node!\n");
@@ -339,7 +440,7 @@ static void rm_cmd() {
 		printf("[+] Successfully removed %s\n", path);
 	else
 		printf("[-] Failed to remove %s\n", path);
-		
+
 }
 
 #undef NEXT_TOKEN

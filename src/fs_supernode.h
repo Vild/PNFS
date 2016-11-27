@@ -20,37 +20,37 @@ struct fs_supernode_vtbl {
 	 * \see fs_supernode_saveNode
 	 */
 	void (*saveNode)(struct fs_supernode * sn, struct fs_node * node);
-	
+
 	/**
 	 * Prototype of fs_supernode_addNode.
 	 * \see fs_supernode_addNode
 	 */
 	struct fs_node * (*addNode)(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name);
-	
+
 	/**
 	 * Prototype of fs_supernode_removeNode.
 	 * \see fs_supernode_removeNode
 	 */
 	bool (*removeNode)(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id);
-	
+
 	/**
 	 * Prototype of fs_supernode_getFreeNodeID.
 	 * \see fs_supernode_getFreeNodeID
 	 */
 	fs_node_id (*getFreeNodeID)(struct fs_supernode * sn);
-	
+
 	/**
 	 * Prototype of fs_supernode_getFreeBlockID.
 	 * \see fs_supernode_getFreeBlockID
 	 */
 	fs_block_id (*getFreeBlockID)(struct fs_supernode * sn);
-	
+
 	/**
 	 * Prototype of fs_supernode_setBlockUsed.
 	 * \see fs_supernode_setBlockUsed
 	 */
 	void (*setBlockUsed)(struct fs_supernode * sn, fs_block_id id);
-	
+
 	/**
 	 * Prototype of fs_supernode_setBlockFree.
 	 * \see fs_supernode_setBlockFree
