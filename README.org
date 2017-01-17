@@ -26,105 +26,294 @@ Mozilla Public License, version 2.0 - See LICENSE or [[https://www.mozilla.org/e
 ** Class diagram
  #+begin_src plantuml :file images/classdiagram.png :exports results
 
- class fs_block {
-	 data: uint8_t[512]
- }
+   class fs_block {
+     This reprecents a block on the disk.
+     ---
+     data: uint8_t[512]
+   }
 
- class fs_blockdevice {
-	 blocks: fs_block[250]
+   class fs_blockdevice {
+     This emulates a block device.
+     A block device could for example be a harddrive.
+     ---
+     blocks: fs_block[250]
 
-	 clear(): void
-	 load(char * file): bool
-	 save(char * file): bool
+     clear(): void
+     load(char * file): bool
+     save(char * file): bool
 
-	 read(fs_block_id idx, fs_block * block)
-	 write(fs_block_id idx, fs_block * block)
- }
- fs_block --o fs_blockdevice
+     read(fs_block_id idx, fs_block * block)
+     write(fs_block_id idx, fs_block * block)
+   }
+   fs_block --o fs_blockdevice
 
- class fs_node {
-	 id: uint16_t
-	 type: uint16_t // fs_node_type
-	 size: uint16_t
-	 blockCount: uint16_t
+   class fs_node {
+     This is a abstract representation of a filesystem node.
+     A node can be either a file or a folder.
+  
+     The underlying filesystem should inherit this for its own node structure.
+     ---
+     id: uint16_t
+     type: uint16_t // fs_node_type
+     size: uint16_t
+     blockCount: uint16_t
 
-	 {abstract} readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): uint16_t
-	 {abstract} writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): bool
+     {abstract} readData(void * buffer, uint16_t offset, uint16_t size): uint16_t
+     {abstract} writeData(void * buffer, uint16_t offset, uint16_t size): bool
 
-	 {abstract} directoryEntries(struct fs_node * node, uint16_t * amount): fs_direntry *
-	 {abstract} findNode(struct fs_node * node, char * path): fs_node *
+     {abstract} directoryEntries(uint16_t * amount): fs_direntry *
+     {abstract} findNode(char * path): fs_node *
 
-	 {abstract} getName(struct fs_node * node, struct fs_node * parent): char *
-	 {abstract} getParent(struct fs_node * node): fs_node *
- }
+     {abstract} getName(struct fs_node * parent): char *
+     {abstract} getParent(struct fs_node * node): fs_node *
+   }
 
- class fs_supernode {
-	 {abstract} getNode(struct fs_supernode * sn, fs_node_id id): fs_node *
-	 {abstract} saveNode(struct fs_supernode * sn, struct fs_node * node): void
+   class fs_supernode {
+     This is a abstract representation of a supernode, the node that stores and controls the while filesystem.
 
-	 {abstract} addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
-	 {abstract} removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id): bool
+     The underlying filesystem should inherit this for its own supernode structure.
+     ---
+     {abstract} getNode(fs_node_id id): fs_node *
+     {abstract} saveNode(struct fs_node * node): void
 
-	 {abstract} getFreeNodeID(struct fs_supernode * sn): fs_node_id
-	 {abstract} getFreeBlockID(struct fs_supernode * sn): fs_block_id
+     {abstract} addNode(struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
+     {abstract} removeNode(struct fs_node * parent, fs_node_id id): bool
 
-	 {abstract} setBlockUsed(struct fs_supernode * sn, fs_block_id id): void
-	 {abstract} setBlockFree(struct fs_supernode * sn, fs_block_id id): void
- }
+     {abstract} getFreeNodeID(struct fs_supernode * sn): fs_node_id
+     {abstract} getFreeBlockID(struct fs_supernode * sn): fs_block_id
 
- enum fs_nodes {
-	 Invalid
-	 Root
- }
+     {abstract} setBlockUsed(fs_block_id id): void
+     {abstract} setBlockFree(fs_block_id id): void
+   }
 
- enum fs_node_type {
-	 Invalid
-	 File
-	 Directory
-	 NeverValid
- }
+   enum fs_nodes {
+     This contains a few standarized node ids and what they represent.
+     ---
+     Invalid = 0
+     Root = 1
+   }
+   fs_nodes -- fs_supernode
 
- class fs_direntry {
-	 id: fs_node_id 
-	 name: char[62]
- }
+   enum fs_node_type {
+     This contains the different types that a fs_node can be.
+     ---
+     Invalid
+     File
+     Directory
+     NeverValid
+   }
+   fs_node_type --o fs_node
 
- class pnfs_node extends fs_node {
-	 dataBlocks: fs_block_id[27]
-	 next: fs_block_id
+   class fs_direntry {
+     This represents a directory entry.
+     ---
+     id: fs_node_id 
+     name: char[62]
+   }
+   fs_direntry -- fs_node
 
-	 runtimeStorage.sn: pnfs_supernode *
+   class pnfs_node extends fs_node {
+     This is the node structure for the implementation of PNFS.
+     ---
+     dataBlocks: fs_block_id[27]
+     next: fs_block_id
 
-	 readData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): uint16_t
-	 writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size): bool
+     runtimeStorage.sn: pnfs_supernode *
 
-	 directoryEntries(struct fs_node * node, uint16_t * amount): fs_direntry *
-	 findNode(struct fs_node * node, char * path): fs_node *
+     readData(void * buffer, uint16_t offset, uint16_t size): uint16_t
+     writeData(void * buffer, uint16_t offset, uint16_t size): bool
 
-	 getName(struct fs_node * node, struct fs_node * parent): char *
-	 getParent(struct fs_node * node): fs_node *
- }
+     directoryEntries(uint16_t * amount): fs_direntry *
+     findNode(char * path): fs_node *
 
- class pnfs_supernode extends fs_supernode {
-	 magic: uint32_t
-	 freeBlocksBitmap: uint8_t[32]
+     getName(struct fs_node * parent): char *
+     getParent(struct fs_node * node): fs_node *
+   }
+   pnfs_supernode --o pnfs_node
 
-	 runtimeStorage.bd: fs_blockdevice *
+   class pnfs_supernode extends fs_supernode {
+     This is the supernode structure for the implementation of PNFS.
+     ---
+     magic: uint32_t
+     freeBlocksBitmap: uint8_t[32]
 
-	 getNode(struct fs_supernode * sn, fs_node_id id): fs_node *
-	 saveNode(struct fs_supernode * sn, struct fs_node * node): void
+     runtimeStorage.bd: fs_blockdevice *
 
-	 addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
-	 removeNode(struct fs_supernode * sn, struct fs_node * parent, fs_node_id id): bool
+     getNode(fs_node_id id): fs_node *
+     saveNode(struct fs_node * node): void
 
-	 getFreeNodeID(struct fs_supernode * sn): fs_node_id
-	 getFreeBlockID(struct fs_supernode * sn): fs_block_id
+     addNode(struct fs_node * parent, enum fs_node_type type, char * name): fs_node *
+     removeNode(struct fs_node * parent, fs_node_id id): bool
 
-	 setBlockUsed(struct fs_supernode * sn, fs_block_id id): void
-	 setBlockFree(struct fs_supernode * sn, fs_block_id id): void
- }
+     getFreeNodeID(struct fs_supernode * sn): fs_node_id
+     getFreeBlockID(struct fs_supernode * sn): fs_block_id
+
+     setBlockUsed(fs_block_id id): void
+     setBlockFree(fs_block_id id): void
+   }
+   fs_blockdevice --o pnfs_supernode
 
  #+end_src
 
  #+RESULTS:
  [[file:images/classdiagram.png]]
+
+* Tree
+#+begin_src dot :file tree.png
+  digraph tree {
+		graph [
+			rankdir = LR,
+			ranksep = 1
+		];
+		node [
+			fontsize = "16"
+			shape = "ellipse"
+		];
+		edge [
+		];
+
+
+		"start" [
+			style=filled,
+			fillcolor=green,
+			label="Filesystem root"
+		];
+		"start" -> "root";
+
+		"root" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,			
+			label="***fs_node***|id = 1|type = dir"
+		];
+		"root" -> "root_direntry":d [
+			shape="record",
+			label = "directoryEntries()"
+		];
+    "root_direntry" [
+			shape="record",
+			style=filled,
+			fillcolor=pink,
+			label="<d>***fs_direntry[]**|<d0> .(1) | <d1> ..(1) | <d2> bin(2) | <d3> data(3)"
+		];
+
+		"root_direntry":d0 -> "root" [
+			label="getNode(1)"
+		];
+
+		"root_direntry":d1 -> "root" [
+			label="getNode(1)"
+		];
+
+		"root_direntry":d2 -> "bin" [
+			label="getNode(2)"
+		];
+
+		"root_direntry":d3 -> "data" [
+			label="getNode(3)"
+		];
+
+	
+    
+		"bin" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 2|type = dir"
+		];
+		"bin" -> "bin_direntry":d [
+			shape="record",
+			label = "directoryEntries()"
+		];
+		"bin_direntry" [
+			shape="record",
+			style=filled,
+			fillcolor=pink,
+			label="<d>***fs_direntry[]***| <d0> .(1) | <d1> ..(1) | <d2> bin(2) | <d3> data(3)"
+		];
+
+		"bin_direntry" [
+			shape="record",
+			label="<d>***fs_direntry[]***| <d0> .(2) | <d1> ..(1) | <d2> helloworld(4) | <d3> testprogram(5)"
+		];
+
+		"bin_direntry":d0 -> "bin" [
+			label="getNode(2)"
+		];
+
+		"bin_direntry":d1 -> "root" [
+			label="getNode(1)"
+		];
+
+		"bin_direntry":d2 -> "helloworld" [
+			label="getNode(4)"
+		];
+
+		"bin_direntry":d3 -> "testprogram" [
+			label="getNode(5)"
+		];
+
+		"data" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 3|type = dir"
+		];
+		"data" -> "data_direntry":d [			
+			shape="record",
+			label = "directoryEntries()"
+		];
+		"data_direntry" [
+			shape="record",
+			style=filled,
+			fillcolor=pink,
+			label="<d>***fs_direntry[]***| <d0> .(3) | <d1> ..(1) | <d2> image.bmp(6) | <d3> sound.ogg(7)"
+		];
+
+		"data_direntry":d0 -> "data" [
+			label="getNode(3)"
+		];
+
+		"data_direntry":d1 -> "root" [
+			label="getNode(1)"
+		];
+
+		"data_direntry":d2 -> "image.bmp" [
+			label="getNode(6)"
+		];
+
+		"data_direntry":d3 -> "sound.ogg" [
+			label="getNode(7)"
+		];
+
+
+		"helloworld" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 4|type = file"
+		];
+		"testprogram" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 5|type = file"
+		];
+		"image.bmp" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 6|type = file"
+		];
+		"sound.ogg" [
+			shape="record",
+			style=filled,
+			fillcolor=cyan,
+			label="***fs_node***|id = 7|type = file"
+		];
+  }
+#+end_src
+
+#+RESULTS:
+[[file:tree.png]]
+
