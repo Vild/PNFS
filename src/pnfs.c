@@ -33,7 +33,7 @@ static char * pnfs_node_getName(struct fs_node * node, struct fs_node * parent);
 static struct fs_node * pnfs_node_getParent(struct fs_node * node);
 
 // VTables
-static struct fs_supernode_vtbl pnfs_supernode_vtbl = (struct fs_supernode_vtbl) {
+static struct fs_supernode_vtbl pnfs_supernode_vtbl = {
 	.getNode = &pnfs_supernode_getNode,
 	.saveNode = &pnfs_supernode_saveNode,
 
@@ -47,7 +47,7 @@ static struct fs_supernode_vtbl pnfs_supernode_vtbl = (struct fs_supernode_vtbl)
 	.setBlockFree = &pnfs_supernode_setBlockFree
 };
 
-static struct fs_node_vtbl pnfs_node_vtbl = (struct fs_node_vtbl) {
+static struct fs_node_vtbl pnfs_node_vtbl = {
 	.readData = &pnfs_node_readData,
 	.writeData = &pnfs_node_writeData,
 
@@ -942,4 +942,3 @@ static struct fs_node * pnfs_node_getParent(struct fs_node * node) {
 		return fs_supernode_getNode((struct fs_supernode *)((struct pnfs_node *)node)->runtimeStorage.sn, id);
 	return NULL;
 }
-
