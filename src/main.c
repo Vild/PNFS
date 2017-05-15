@@ -258,8 +258,8 @@ static void create_cmd() {
 	char * lastSlash = strrchr(path, '/');
 	if (lastSlash) {
 		*lastSlash = '\0';
-		path = lastSlash + 1;
 		parent = fs_node_findNode(parent, path);
+		path = lastSlash + 1;
 	}
 
 	if (!parent) {
@@ -359,19 +359,42 @@ static void ls_cmd() {
 }
 
 static void mkdir_cmd() {
-	char * filename = NEXT_TOKEN;
-	if (!filename) {
+	char * path = NEXT_TOKEN;
+	if (!path) {
 		printf("[-] A filename is required!\n");
 		return;
 	}
 
-	struct fs_node * n = fs_node_findNode(cwd, filename);
+	struct fs_node * n = fs_node_findNode(cwd, path);
 	if (n) {
 		free(n);
 		printf("[-] There is already a node with that name\n");
 		return;
 	}
-	free(fs_supernode_addNode(sn, cwd, NODETYPE_DIRECTORY, filename));
+
+	struct fs_node * parent = cwd;
+
+	char * lastSlash = strrchr(path, '/');
+	if (lastSlash) {
+		*lastSlash = '\0';
+		parent = fs_node_findNode(parent, path);
+		path = lastSlash + 1;
+	}
+
+	if (!parent) {
+		printf("[-] Could not find parent!\n");
+		return;
+	}
+
+	struct fs_node * node = fs_supernode_addNode(sn, parent, NODETYPE_DIRECTORY, path);
+	if (!node) {
+		printf("[-] Could not add node!\n");
+		return;
+	}
+
+	free(node);
+	if (parent != cwd)
+		free(parent);
 }
 
 static void pwd_cmd() {
@@ -407,40 +430,39 @@ static void rm_cmd() {
 		return;
 	}
 
-	{
-		// Check if it is valid to remove, aka. It can't try and remove the '.' or '..' links
-		char * saveptr = NULL;
-		char * cur = strtok_r(path, "/", &saveptr);
-		char * last = NULL;
-		while (cur) {
-			last = cur;
-			cur = strtok_r(NULL, "/", &saveptr);
-		}
-
-		if (!last) {
-			printf("[-] Could not find node! Invalid path?\n");
-			return;
-		}
-
-		if (!strcmp(last, ".") || !strcmp(last, "..")) {
-			printf("[-] You cannot remove '.' or '..'!\n");
-			return;
-		}
-	}
-
 	struct fs_node * node = fs_node_findNode(cwd, path);
 	if (!node) {
-		printf("[-] Could not find node!\n");
+		printf("[-] Could not find node\n");
+		return;
+	}
+
+	struct fs_node * parent = cwd;
+
+	char * lastSlash = strrchr(path, '/');
+	if (lastSlash) {
+		*lastSlash = '\0';
+		parent = fs_node_findNode(parent, path);
+		path = lastSlash + 1;
+	}
+
+	if (!parent) {
+		free(node);
+		printf("[-] Could not find parent!\n");
 		return;
 	}
 
 	fs_node_id id = node->id;
 	free(node);
-	if (fs_supernode_removeNode(sn, cwd, id))
+
+	if (id == NODE_ROOT)
+		printf("[-] You can't remove the root node!\n", path);
+	else if (fs_supernode_removeNode(sn, parent, id))
 		printf("[+] Successfully removed %s\n", path);
 	else
 		printf("[-] Failed to remove %s\n", path);
 
+	if (parent != cwd)
+		free(parent);
 }
 
 #undef NEXT_TOKEN

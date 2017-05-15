@@ -8,7 +8,7 @@ void fs_supernode_saveNode(struct fs_supernode * sn, struct fs_node * node) {
 	return sn->vtbl->saveNode(sn, node);
 }
 
-struct fs_node * fs_supernode_addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, char * name) {
+struct fs_node * fs_supernode_addNode(struct fs_supernode * sn, struct fs_node * parent, enum fs_node_type type, const char * name) {
 	return sn->vtbl->addNode(sn, parent, type, name);
 }
 

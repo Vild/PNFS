@@ -18,7 +18,7 @@ struct fs_node_vtbl {
 	 * Prototype of fs_node_writeData.
 	 * \see fs_node_writeData
 	 */
-	uint16_t (*writeData)(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
+	uint16_t (*writeData)(struct fs_node * node, const void * buffer, uint16_t offset, uint16_t size);
 
 	/**
 	 * Prototype of fs_node_directoryEntries.
@@ -30,7 +30,7 @@ struct fs_node_vtbl {
 	 * Prototype of fs_node_findNode.
 	 * \see fs_node_findNode
 	 */
-	struct fs_node * (*findNode)(struct fs_node * node, char * path);
+	struct fs_node * (*findNode)(struct fs_node * node, const char * path);
 
 	/**
 	 * Prototype of fs_node_getName.
@@ -87,7 +87,7 @@ uint16_t fs_node_readData(struct fs_node * node, void * buffer, uint16_t offset,
  * \return The amount of data written
  * \relates fs_node
  */
-uint16_t fs_node_writeData(struct fs_node * node, void * buffer, uint16_t offset, uint16_t size);
+uint16_t fs_node_writeData(struct fs_node * node, const void * buffer, uint16_t offset, uint16_t size);
 
 /**
  * Get a array of all the entries in a directory
@@ -106,7 +106,7 @@ struct fs_direntry * fs_node_directoryEntries(struct fs_node * node, uint16_t * 
  * \return The node it found else NULL
  * \relates fs_node
  */
-struct fs_node * fs_node_findNode(struct fs_node * node, char * path);
+struct fs_node * fs_node_findNode(struct fs_node * node, const char * path);
 
 /**
  * Get the name a of node.
